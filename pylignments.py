@@ -23,17 +23,18 @@ class aligner:
         self.path = np.array([[[[0]*n]*m]*n]*m)
         self.matrix = np.array([[[0,0]]*n+1]*m+1)
         for x in range(0,m+1):
-	    self.matrix[0][x] = [value,1]
+            self.matrix[0][x] = [value,1]
             value = value + self.config.indel
-	value = 0
-	for x in range(0,n+1):
-	    self.matrix[x][0] = [value,1]
+        value = 0
+        for x in range(0,n+1):
+            self.matrix[x][0] = [value,1]
             value = value + self.config.indel
     
     def needlemanWunsch(self):
-        
+        print("not implemented")
+    
     def needlemanWunsch_iterative(self):
-        
+        print("not implemented")
         
     def needlemanWunsch_recursive(self, m, n):
         if(self.matrix[m-1][n-1][1] == 0):
@@ -42,14 +43,14 @@ class aligner:
             needlemanWunsch_recursive(m-1,n)     # calculate left neighbor
         if(self.matrix[m][n-1][1] == 0):
             needlemanWunsch_recursive(m,n-1)     # calculate upper neighbor
-	self.needlemanWunsch_calcScore(m,n)
+        self.needlemanWunsch_calcScore(m,n)
 
-     def needlemanWunsch_calcScore(m,n):
+    def needlemanWunsch_calcScore(m,n):
         # calculate all possible incoming scores
         pDiagonalScore = 0
         if(self.config.seq1[m-1] == self.config.seq2[n-1]):
             pDiagonalScore = self.matrix[m-1][n-1][0] + self.config.match
-        else
+        else:
             pDiagonalScore = self.matrix[m-1][n-1][0] + self.config.mismatch
         pUpperScore = self.matrix[m][n-1][0] + self.config.indel
         pLeftScore  = self.matrix[m-1][n][0] + self.config.indel
