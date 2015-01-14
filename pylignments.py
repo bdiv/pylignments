@@ -11,10 +11,11 @@ class aligner:
     """ Alignes two sequences using Needleman-Wunsch, Smith&Waterman or Endfree alignment """
     # constructor
     def __init__(self, conf):
-        self.config = conf        # store config
+        self.config = conf          # store config
         self.row = len(conf.seq1)   # store length of sequence1
         self.col = len(conf.seq2)   # store length of sequence2
-        self.sequences = []
+        self.sequences = []         # will contain the aligned sequences
+        # run the respective routine depending on the configured algorithm
         if(conf.algorithm == "nw" or conf.algorithm == "NW"):
             self.needlemanWunsch()
         elif(conf.algorithm == "ef" or conf.algorithm == "EF"):
@@ -50,9 +51,9 @@ class aligner:
             value = value + self.config.indel
     
     def needlemanWunsch(self):
-        self.initNeedlemanWunsch()
-        self.recursive_calc(self.row,self.col)
-        self.backtrace()
+        self.initNeedlemanWunsch()              # initialize marices (scores & path)
+        self.recursive_calc(self.row,self.col)  # calculate actual scores
+        self.backtrace()                        # backtrace, store aligned sequences in self.sequences and store best score
     
     def needlemanWunsch_iterative(self):
         print("not implemented")
@@ -124,13 +125,14 @@ class aligner:
         self.initEndFree()    # uses the same initialization as end free does
         
     def smithWaterman(self):
-        self.initSmithWaterman()
-        self.recursive_calc(self.row, self.col)
-        self.backtrace()
+        self.initSmithWaterman()                 # initialize score and path matrices
+        self.recursive_calc(self.row, self.col)  # calculate scores recursively
+        self.backtrace()                         # backtrace optimal paths, store alignments and score
   
     # general methods        
     # print the matrices with predefined style characters from config
     def printMatrix(self, backtrace):
+        # get the configured characters for visulization
         right = self.config.charPathRight
         down = self.config.charPathDown
         diag = self.config.charPathDiag
@@ -153,7 +155,7 @@ class aligner:
                 else:
                     line1 = line1 + "{:4d} ".format(self.matrix[row][col][0])    # score field
                 try:                                                     
-                    if(self.path[row][col][row][col+1]==1):
+                    if(self.path[row][col][row][col+1]==1):              # if path exist
                         line1 = line1 + right
                     else:
                         line1 = line1 + vSpacer
@@ -198,80 +200,89 @@ class aligner:
         print("")
     
     def backtrace(self):
-        col1 = self.col + 1
-        row1 = self.row + 1
-        self.bpath = np.array([[" "]*col1]*row1)         
+        # base method for backtracing, will call a recursive routine
+        col1 = self.col + 1                            # for convenience
+        row1 = self.row + 1                            # for convenience
+        self.bpath = np.array([[" "]*col1]*row1)       # stores the backtrace path as characters
         if(self.config.algorithm == "nw" or self.config.algorithm == "NW"):
-            self.backtrace_recursive(self.row, self.col, ("",""))
-            self.bpath[self.row][self.col] = self.config.charBacktraceEnd
-            self.score = self.matrix[self.row][self.col][0]
+            # if we use needleman wunsch
+            self.backtrace_recursive(self.row, self.col, ("",""))            # start recursive routine
+            self.bpath[self.row][self.col] = self.config.charBacktraceEnd    # mark the end of the path
+            self.score = self.matrix[self.row][self.col][0]                  # save the score
         elif(self.config.algorithm == "sw" or self.config.algorithm == "SW"):
-            s = (0, [(0,0)])
+            # if we use smith waterman
+            s = (0, [(0,0)])                                         # will contain the scores and and array containing the corresponding points
+            # loop through the matrix and find the highest scores
             for row in range(0, self.row + 1):
                 for col in range(0, self.col + 1):
-                    if(self.matrix[row][col][0] > s[0]):
-                        s = (self.matrix[row][col][0],[(row, col)])
-                    elif(self.matrix[row][col][0] == s[0]):
-                        s[1].append((row, col))
-            self.score = s[0]
+                    if(self.matrix[row][col][0] > s[0]):             # if we found a higher score
+                        s = (self.matrix[row][col][0],[(row, col)])  # overwrite s with new values
+                    elif(self.matrix[row][col][0] == s[0]):          # if the score is equal to our stored one
+                        s[1].append((row, col))                      # append to the list of points
+            self.score = s[0]                                        # store score
+            for point in s[1]:                                       # loop through points
+                self.backtrace_recursive(point[0], point[1], ("",""))# start backtrace for every point with the highest score
             for point in s[1]:
-                self.backtrace_recursive(point[0], point[1], ("",""))
-            for point in s[1]:
-                self.bpath[point[0]][point[1]] = self.config.charBacktraceEnd
+                self.bpath[point[0]][point[1]] = self.config.charBacktraceEnd # mark the end of every path
         elif(self.config.algorithm == "ef" or self.config.algorithm == "EF"):
-            s = (0, [(0,0)])
-            for row in range(0, self.row):
-                if(self.matrix[row][self.col][0] > s[0]):
-                    s = (self.matrix[row][self.col][0],[(row, self.col)])
-                elif(self.matrix[row][self.col][0] == s[0]):
-                    s[1].append((row, self.col))
-            for col in range(0, self.col+1):
-                if(self.matrix[self.row][col][0] > s[0]):
-                    s = (self.matrix[self.row][col][0], [(self.row, col)])
-                elif(self.matrix[self.row][col][0] == s[0]):
-                    s[1].append((self.row, col))
-            self.score = s[0]
-            for point in s[1]:
-                self.backtrace_recursive(point[0],point[1], ("",""))
-            for point in s[1]:
-                self.bpath[point[0]][point[1]] = self.config.charBacktraceEnd
+            # if we use end free
+            s = (0, [(0,0)])                                             # used to store the highest score and the respective points
+            for row in range(0, self.row):                               # loop through all points of the right boundary 
+                if(self.matrix[row][self.col][0] > s[0]):                # if we found a higher score
+                    s = (self.matrix[row][self.col][0],[(row, self.col)])# overwrite the current s
+                elif(self.matrix[row][self.col][0] == s[0]):             # if we found an equal score
+                    s[1].append((row, self.col))                         # append the point
+            for col in range(0, self.col+1):                             # loop through the points of the lower boundary
+                if(self.matrix[self.row][col][0] > s[0]):                # if we found a higher score
+                    s = (self.matrix[self.row][col][0], [(self.row, col)])# overwrite s
+                elif(self.matrix[self.row][col][0] == s[0]):             # if we found an equal score
+                    s[1].append((self.row, col))                         # append point to s
+            self.score = s[0]                                            # store score
+            for point in s[1]:                                           # loop through all points we found
+                self.backtrace_recursive(point[0],point[1], ("",""))     # backtrace them
+            for point in s[1]:                                           # loop through points again
+                self.bpath[point[0]][point[1]] = self.config.charBacktraceEnd# mark the ends
         else:
             raise Exception("Cannot backtrace because of undefined algorithm")   # this should never happen bc we check the algorithm while parsing the config file
 
     def backtrace_recursive(self,row,col, seq):
+        # recursive backtrace routine
         try:
-            seq1 = seq[0]
-            seq2 = seq[1]
-            x = self.config.charBacktracePart
-            self.bpath[row][col] = x
-            upPath = self.path[row][col][row-1][col]
-            leftPath = self.path[row][col][row][col-1]
-            diagPath = self.path[row][col][row-1][col-1]            
+            seq1 = seq[0] # for convenience
+            seq2 = seq[1] # for convenience
+            self.bpath[row][col] = self.config.charBacktracePart # mark the current path field
+            upPath = self.path[row][col][row-1][col]             # contains 0 or 1, depending on the existence of a path
+            leftPath = self.path[row][col][row][col-1]           # contains 0 or 1, depending on the existence of a path
+            diagPath = self.path[row][col][row-1][col-1]         # contains 0 or 1, depending on the existence of a path
             # print(str(seq) + " row: " + str(row) + " col: " + str(col) + " up: " + str(upPath) + " left: " + str(leftPath) + " diag: " + str(diagPath))
-            if((self.config.algorithm == "nw" or self.config.algorithm == "NW") and row == 0 and col == 0):
+            # we have different conditions for exit
+            if((self.config.algorithm == "nw" or self.config.algorithm == "NW") and row == 0 and col == 0): # if we reach (0,0) in needlemanWunsch
                 self.sequences.append(seq)
                 return            
-            if((self.config.algorithm == "ef" or self.config.algorithm == "EF") and (row == 0 or col == 0)):
+            if((self.config.algorithm == "ef" or self.config.algorithm == "EF") and (row == 0 or col == 0)):# if we reach the upper or left boundary in end free
                 self.sequences.append(seq)
                 return
             if((self.config.algorithm == "sw" or self.config.algorithm == "SW") and (upPath == 0 and leftPath == 0 and diagPath == 0 )):
+                # if we have nowhere to go in smith waterman 
+                # note: the scoring algorithm (calcscore_recursive())marks the path. If a score gets below 0 it is set to 0 and the path ends.
+                # we could've also just checked the score instead
                 self.sequences.append(seq)
                 return
-            if(leftPath == 1):
+            if(leftPath == 1):                                  # if we can go left
                 # print("left")
-                s1 = "-" + seq1
-                s2 = self.config.seq2[col-1] + seq2
-                self.backtrace_recursive(row, col-1, (s1,s2))
-            if(diagPath == 1):
+                s1 = "-" + seq1                                 # append "-"
+                s2 = self.config.seq2[col-1] + seq2             # append next character to the sequence
+                self.backtrace_recursive(row, col-1, (s1,s2))   # go to the left field
+            if(diagPath == 1):                                  # if we can go diagonal
                 # print("diag")
-                s1 = self.config.seq1[row-1] + seq1
-                s2 = self.config.seq2[col-1] + seq2
-                self.backtrace_recursive(row-1, col-1,(s1,s2))
-            if(upPath == 1):
+                s1 = self.config.seq1[row-1] + seq1             # align char of seq1 with...
+                s2 = self.config.seq2[col-1] + seq2             # ...char of seq2
+                self.backtrace_recursive(row-1, col-1,(s1,s2))  # go diagonal
+            if(upPath == 1):                                    # if we can go up
                 # print("up")
-                s1 = self.config.seq1[row-1] + seq1
-                s2 = "-" + seq2
-                self.backtrace_recursive(row-1,col, (s1,s2))
+                s1 = self.config.seq1[row-1] + seq1             # append next character to the sequence
+                s2 = "-" + seq2                                 # appen "-"
+                self.backtrace_recursive(row-1,col, (s1,s2))    # go up
             # up = self.matrix[row-1][col][0]
             # left = self.matrix[row][col-1][0]
             # diag = self.matrix[row-1][col-1][0]
@@ -330,16 +341,18 @@ class config:
     charSpacerCon = "+"
     # constructor - already reads the file and fills everything
     def __init__(self, path):
-        file = open(path, 'r')  # open config file in read mode
-        text = file.read()      # read everything for convenience
-        algo = re.search("alg:\s(sw|nw|ef|SW|NW|EF)", text)           # search the algorithm
+        file = open(path, 'r')                                 # open config file in read mode
+        text = file.read()                                     # read everything for convenience
+        file.close()                                           # close file
+        # using regex because regex are cool
+        algo = re.search("alg:\s(sw|nw|ef|SW|NW|EF)", text)    # search the algorithm
         match = re.search("match:\s([\+|-][\d]+)", text)       # search the matching score
         mismatch = re.search("mismatch:\s([\+|-][\d]+)", text) # search the mismatching score
         indel = re.search("indel:\s([\+|-][\d]+)", text)       # search the indel score
-        seq2 = re.search("seq1: ([A-Z]{1,200})", text)       # search sequence 1
-        seq1 = re.search("seq2: ([A-Z]{1,200})", text)       # search sequence 2
-    
-        # check all the fields and safe them if they're ok    
+        seq2 = re.search("seq1: ([A-Z]{1,200})", text)         # search sequence 1
+        seq1 = re.search("seq2: ([A-Z]{1,200})", text)         # search sequence 2
+        #
+        # check all the fields and save them if they're ok    
         if(algo):
             self.algorithm = algo.group(1)
         else:
@@ -381,7 +394,7 @@ class config:
 parser = argparse.ArgumentParser()
 parser.add_argument("file", help="config file, which specifies the sequences, scores and the algorithm to use")
 args = parser.parse_args()
-conf = config(args.file)
-align = aligner(conf)
+conf = config(args.file)             # create config object (parses config file)
+align = aligner(conf)                # create aligner. this will start the alignment based on the provided configs
 #print(align.matrix)
-align.printSpreadSheet()
+align.printSpreadSheet()             # print out neat little spread sheet 
