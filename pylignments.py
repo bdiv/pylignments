@@ -15,7 +15,11 @@ class aligner:
         self.row = len(conf.seq1)   # store length of sequence1
         self.col = len(conf.seq2)   # store length of sequence2
         self.sequences = []         # will contain the aligned sequences
-        # run the respective routine depending on the configured algorithm
+        self.path = dict()
+        row1 = self.row + 1
+        col1 = self.col + 1
+        self.matrix = np.array([[[0,0]]*col1]*row1)  # create our matrix
+         # run the respective routine depending on the configured algorithm
         if(conf.algorithm == "nw" or conf.algorithm == "NW"):
             self.needlemanWunsch()
         elif(conf.algorithm == "ef" or conf.algorithm == "EF"):
@@ -32,22 +36,15 @@ class aligner:
         col1 = col+1       # stupid stuff bc of typeError during concatenation
         row1 = row+1       #  ...
         value = 0
-        self.path = np.array([[[[0]*col1]*row1]*col1]*row1)    # create 4 dimmensional array to safe baths 
-        self.matrix = np.array([[[0,0]]*col1]*row1)  # create our matrix
+        #self.path = np.array([[[[0]*col1]*row1]*col1]*row1)    # create 4 dimmensional array to safe baths 
         for x in range(0,row1):                      # initialize first row
             self.matrix[x][0] = [value,1]            # 1 is the "set"-flag
-            try:
-                self.path[x][0][x+1][0] = 1
-            except IndexError:
-                1 == 1 # do nothing
-            value = value + self.config.indel       # alter value for the next field
+            self.path[(x,0,x+1,0)] = 1               # set the pathing
+            value = value + self.config.indel        # alter value for the next field
         value = 0                  
-        for x in range(0,col1):                     # initialize first column
+        for x in range(0,col1):                      # initialize first column
             self.matrix[0][x] = [value,1] 
-            try:
-                self.path[0][x][0][x+1] = 1
-            except IndexError:
-                1 == 1 # do nothing
+            self.path[(0,x,0,x+1)] = 1
             value = value + self.config.indel
     
     def needlemanWunsch(self):
@@ -84,23 +81,23 @@ class aligner:
                 self.matrix[row][col] = [0,1]              # set score to 0, no path is saved
             else:
                 self.matrix[row][col] = [pDiagonalScore,1] # else save score and path
-                self.path[row][col][row-1][col-1] = 1
-                self.path[row-1][col-1][row][col] = 1
+                self.path[(row,col,row-1,col-1)] = 1
+                # self.path[(row-1,col-1,row,col)] = 1
         if(pUpperScore >= pDiagonalScore and pUpperScore >= pLeftScore):
             # if the algorithm is smith waterman and the score is below 0
             if((self.config.algorithm == "sw" or self.config.algorithm == "SW") and pUpperScore < 0):
                 self.matrix[row][col] = [0,1]              # set score to 0, no path is saved
             else:
                 self.matrix[row][col] = [pUpperScore,1]    # else save score and path
-                self.path[row][col][row][col-1] = 1
-                self.path[row][col-1][row][col] = 1
+                self.path[(row,col,row,col-1)] = 1
+                # self.path[(row,col-1,row,col)] = 1
         if(pLeftScore >= pDiagonalScore and pLeftScore >= pUpperScore):
             if((self.config.algorithm == "sw" or self.config.algorithm == "SW") and pLeftScore < 0):
                 self.matrix[row][col] = [0,1]
             else:
                 self.matrix[row][col] = [pLeftScore,1]
-                self.path[row][col][row-1][col] = 1
-                self.path[row-1][col][row][col] = 1
+                self.path[(row,col,row-1,col)] = 1
+                # self.path[(row-1,col,row,col)] = 1
     
     # end free
     def initEndFree(self):
@@ -108,8 +105,8 @@ class aligner:
         row = self.row     # set local m
         col1 = col+1       # stupid stuff bc of typeError during concatenation while initializing the matrices below
         row1 = row+1       #  ...
-        self.path = np.array([[[[0]*col1]*row1]*col1]*row1)    # create 4 dimmensional array to safe baths
-        self.matrix = np.array([[[0,0]]*col1]*row1)  # create our matrix
+        # self.path = np.array([[[[0]*col1]*row1]*col1]*row1)    # create 4 dimmensional array to safe baths
+        #self.matrix = np.array([[[0,0]]*col1]*row1)  # create our matrix
         for x in range(0,row1):                      # initialize first row
             self.matrix[x][0] = [0,1]                # 1 is the "set"-flag
         for x in range(0,col1):                      # initialize first column
@@ -153,29 +150,20 @@ class aligner:
                 if(backtrace == 1 or self.bpath[row][col] == self.config.charBacktraceEnd):
                     line1 = line1 + "{:4d}".format(self.matrix[row][col][0]) + self.bpath[row][col] # score field + backtrace path
                 else:
-                    line1 = line1 + "{:4d} ".format(self.matrix[row][col][0])    # score field
-                try:                                                     
-                    if(self.path[row][col][row][col+1]==1):              # if path exist
-                        line1 = line1 + right
-                    else:
-                        line1 = line1 + vSpacer
-                except IndexError:
-                    line1 = line1 + vSpacer                              # if we're at the last column...
-                line2 = line2 + hSpacer*2                                # first part of the spacer
-                try: 
-                    if(self.path[row][col][row+1][col]==1):                      # middle part of the spacer, the path indicator
-                        line2 = line2 + down
-                    else:
-                        line2 = line2 + hSpacer
-                except IndexError:
-                    line2 = line2 + hSpacer                              # if path.[row][col][row+1][col] is outside of our matrix
-                line2 = line2 + hSpacer*2                                # third part of the spacer
-                try:                                                     # last part, it's a path indicator again. Prints a + if we're out of bounds
-                    if(self.path[row][col][row+1][col+1]==1):
-                        line2 = line2 + diag
-                    else: 
-                        line2 = line2 + con
-                except IndexError:
+                    line1 = line1 + "{:4d} ".format(self.matrix[row][col][0])    # score field                                                    
+                if( (row,col+1,row,col) in  self.path.keys()):                   # if path exist
+                    line1 = line1 + right
+                else:
+                    line1 = line1 + vSpacer
+                line2 = line2 + hSpacer*2                       # first part of the spacer
+                if( (row+1,col,row,col) in self.path.keys()):   # middle part of the spacer, the path indicator
+                    line2 = line2 + down
+                else:
+                    line2 = line2 + hSpacer
+                line2 = line2 + hSpacer*2                       # third part of the spacer
+                if( (row+1,col+1,row,col) in self.path.keys()):
+                    line2 = line2 + diag
+                else: 
                     line2 = line2 + con
             print(line1)
             print(line2)
@@ -251,9 +239,19 @@ class aligner:
             seq1 = seq[0] # for convenience
             seq2 = seq[1] # for convenience
             self.bpath[row][col] = self.config.charBacktracePart # mark the current path field
-            upPath = self.path[row][col][row-1][col]             # contains 0 or 1, depending on the existence of a path
-            leftPath = self.path[row][col][row][col-1]           # contains 0 or 1, depending on the existence of a path
-            diagPath = self.path[row][col][row-1][col-1]         # contains 0 or 1, depending on the existence of a path
+            if( (row,col,row-1,col) in self.path.keys()):            
+                upPath = 1   # contains 0 or 1, depending on the existence of a path
+            else:
+                upPath = 0
+
+            if( (row,col,row,col-1) in self.path.keys()):
+                leftPath = 1 # contains 0 or 1, depending on the existence of a path
+            else:
+                leftPath = 0
+            if( (row,col,row-1,col-1) in self.path.keys()):
+                diagPath = 1
+            else: 
+                diagPath = 0 # contains 0 or 1, depending on the existence of a path
             # print(str(seq) + " row: " + str(row) + " col: " + str(col) + " up: " + str(upPath) + " left: " + str(leftPath) + " diag: " + str(diagPath))
             # we have different conditions for exit
             if((self.config.algorithm == "nw" or self.config.algorithm == "NW") and row == 0 and col == 0): # if we reach (0,0) in needlemanWunsch
