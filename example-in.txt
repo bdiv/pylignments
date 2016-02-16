@@ -1,0 +1,7 @@
+alg: SW
+match: +5
+mismatch: -2
+indel: -6
+seq1: AGCATGT
+seq2: CGCAATGA
+
