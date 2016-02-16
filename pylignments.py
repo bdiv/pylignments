@@ -4,6 +4,7 @@
 import argparse    # for argument parsing
 import re          # for regex
 import numpy as np # for numpy arrays
+import sys
 
 #classes
 
@@ -128,7 +129,7 @@ class aligner:
   
     # general methods        
     # print the matrices with predefined style characters from config
-    def printMatrix(self, backtrace):
+    def printMatrix(self, backtrace, out):
         # get the configured characters for visulization
         right = self.config.charPathRight
         down = self.config.charPathDown
@@ -137,9 +138,9 @@ class aligner:
         hSpacer = self.config.charHSpacer
         vSpacer = self.config.charVSpacer
         head = "  "+"{:>6s}"*len(self.config.seq2) # head string
-        print(head.format(*self.config.seq2))      # print head string
+        out.write(head.format(*self.config.seq2) + '\n')      # print head string
         x = len(self.config.seq2)+1                
-        print(" " + con + (hSpacer*5 + con )*x)                     # print spacer, x is the number of fields
+        out.write(" " + con + (hSpacer*5 + con )*x + '\n')                     # print spacer, x is the number of fields
         for row in range(0,len(self.config.seq1)+1): # for every line   
             line1 = " " + vSpacer                  # line1 contains the scores and path flags and indicators
             try: 
@@ -165,27 +166,31 @@ class aligner:
                     line2 = line2 + diag
                 else: 
                     line2 = line2 + con
-            print(line1)
-            print(line2)
+            out.write(line1 + '\n')
+            out.write(line2 + '\n')
     
     # print the spread sheet version shown in the example
-    def printSpreadSheet(self):
-        print("Forward part:")
-        print("")
-        self.printMatrix(0)
-        print("")
-        print("")
-        print("Backward part:")
-        print("")
-        align.printMatrix(1)
-        print("")
-        print("")
-        print("Alignments (Score: " + str(align.score) + "):")
+    def printSpreadSheet(self, outFilePath):
+        if(outFilePath != ""):
+            out = open(outFilePath, 'w')
+        else:
+            out = sys.stdout
+        out.write("Forward part:" + '\n')
+        out.write("" + '\n')
+        self.printMatrix(0, out)
+        out.write("" + '\n')
+        out.write("" + '\n')
+        out.write("Backward part:" + '\n')
+        out.write("" + '\n')
+        align.printMatrix(1, out)
+        out.write("" + '\n')
+        out.write("" + '\n')
+        out.write("Alignments (Score: " + str(align.score) + "):" + '\n')
         for ali in align.sequences:
-            print("")
-            print(ali[1])
-            print(ali[0])
-        print("")
+            out.write("" + '\n')
+            out.write(ali[1] + '\n')
+            out.write(ali[0] + '\n')
+        out.write("" + '\n')
     
     def backtrace(self):
         # base method for backtracing, will call a recursive routine
@@ -390,9 +395,10 @@ class config:
 
 # commandline argument configuration
 parser = argparse.ArgumentParser()
-parser.add_argument("file", help="config file, which specifies the sequences, scores and the algorithm to use")
+parser.add_argument("infile", help="config file, which specifies the sequences, scores and the algorithm to use")
+parser.add_argument("outfile", nargs='?', default="", help="output file")
 args = parser.parse_args()
-conf = config(args.file)             # create config object (parses config file)
+conf = config(args.infile)             # create config object (parses config file)
 align = aligner(conf)                # create aligner. this will start the alignment based on the provided configs
 #print(align.matrix)
-align.printSpreadSheet()             # print out neat little spread sheet 
+align.printSpreadSheet(args.outfile)             # print out neat little spread sheet 
